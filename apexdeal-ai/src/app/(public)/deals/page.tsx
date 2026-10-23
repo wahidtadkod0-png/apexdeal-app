@@ -1,15 +1,61 @@
-import Link from 'next/link';
-import { ArrowUpRight, BadgePercent, Search, ShieldCheck, Sparkles, Zap } from 'lucide-react';
-import { prisma } from '@/lib/prisma';
+import { prisma } from "@/lib/prisma";
+
+export const dynamic = "force-dynamic";
 
 export default async function DealsPage() {
-  const deals = await prisma.deal.findMany({ where: { status: 'PUBLISHED', store: { enabled: true }, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] }, include: { store: { select: { name: true, slug: true } } }, orderBy: [{ isSuperLoot: 'desc' }, { qualityScore: 'desc' }, { createdAt: 'desc' }], take: 12 });
-  return <main className="min-h-screen">
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur"><div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4"><Link href="/deals" className="flex items-center gap-2 font-black tracking-tight"><span className="rounded-xl bg-orange-600 p-2 text-white"><Zap size={20}/></span><span className="text-xl">ApexDeal <span className="text-orange-600">AI</span></span></Link><nav className="hidden gap-6 text-sm font-semibold text-slate-600 md:flex"><a href="#deals">Top Deals</a><a href="#stores">Stores</a><a href="#videos">Video Finds</a></nav><Link className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold" href="mailto:support@yourdomain.com">Contact</Link></div></header>
-    <section className="mx-auto grid max-w-7xl gap-8 px-4 py-12 md:grid-cols-[1.2fr_.8fr] md:items-center md:py-20"><div><div className="mb-5 inline-flex items-center gap-2 rounded-full border border-orange-200 bg-orange-50 px-3 py-1.5 text-xs font-bold text-orange-700"><Sparkles size={14}/> SMARTER SHOPPING STARTS HERE</div><h1 className="max-w-3xl text-4xl font-black leading-tight tracking-tight md:text-6xl">Big savings. <span className="text-orange-600">Zero guesswork.</span></h1><p className="mt-5 max-w-xl text-lg leading-8 text-slate-600">Handpicked finds across your favorite stores, with clear deal highlights to help you shop with confidence.</p><form action="/deals" className="mt-8 flex max-w-xl gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm"><Search className="ml-2 mt-2 text-slate-400"/><input name="q" placeholder="Search deals, brands, categories..." className="min-w-0 flex-1 bg-transparent px-2 py-2 outline-none"/><button className="rounded-xl bg-slate-950 px-5 py-3 font-bold text-white">Search</button></form><div className="mt-6 flex flex-wrap gap-4 text-sm text-slate-500"><span className="flex items-center gap-2"><ShieldCheck size={16}/> Curated links</span><span className="flex items-center gap-2"><BadgePercent size={16}/> Deal highlights</span></div></div><div className="rounded-3xl bg-slate-950 p-6 text-white shadow-xl md:p-8"><div className="flex items-center justify-between"><span className="text-sm font-bold text-orange-300">THE DEAL COPILOT</span><Sparkles className="text-orange-300"/></div><h2 className="mt-8 text-3xl font-extrabold">Good deals, made easier.</h2><p className="mt-3 leading-7 text-slate-300">Discover curated offers, compare listed prices, and jump directly to participating retailers.</p><div className="mt-8 rounded-2xl border border-white/10 bg-white/5 p-4"><div className="flex justify-between text-sm"><span className="text-slate-300">Deal discovery</span><span className="font-bold text-emerald-300">AI-assisted</span></div><div className="mt-3 h-2 rounded-full bg-white/10"><div className="h-2 w-4/5 rounded-full bg-orange-500"/></div><p className="mt-3 text-xs text-slate-400">Scores are estimates and depend on available product data.</p></div></div></section>
-    <section id="deals" className="mx-auto max-w-7xl px-4 pb-16"><div className="mb-6 flex items-end justify-between"><div><p className="text-sm font-bold uppercase tracking-wider text-orange-600">Curated for you</p><h2 className="mt-1 text-3xl font-black">Trending deals</h2></div><span className="text-sm text-slate-500">{deals.length} featured</span></div>{deals.length === 0 ? <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-12 text-center"><Sparkles className="mx-auto text-orange-600" size={30}/><h3 className="mt-4 text-xl font-bold">Your next great find is on the way</h3><p className="mt-2 text-slate-500">Published deals will appear here once your store feeds are connected.</p></div> : <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{deals.map(deal => <article key={deal.id} className="overflow-hidden rounded-3xl border border-slate-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"><div className="relative flex h-48 items-center justify-center bg-slate-100">{deal.imageUrl ? <img src={deal.imageUrl} alt={deal.title} className="h-full w-full object-contain p-4"/> : <BadgePercent size={44} className="text-slate-300"/>}{deal.isSuperLoot && <span className="absolute left-3 top-3 rounded-full bg-orange-600 px-3 py-1 text-xs font-black text-white">🔥 SUPER LOOT</span>}{deal.discountPercent != null && <span className="absolute right-3 top-3 rounded-full bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800">{deal.discountPercent}% OFF</span>}</div><div className="p-5"><div className="text-xs font-bold uppercase tracking-wider text-slate-400">{deal.store.name} · {deal.category}</div><h3 className="mt-2 line-clamp-2 min-h-12 font-bold">{deal.title}</h3>{deal.whyBuy && <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{deal.whyBuy}</p>}<div className="mt-5 flex items-end justify-between"><div>{deal.price != null && <div className="text-2xl font-black">{deal.currency} {Number(deal.price).toLocaleString('en-IN')}</div>}{deal.originalPrice != null && <div className="text-sm text-slate-400 line-through">{deal.currency} {Number(deal.originalPrice).toLocaleString('en-IN')}</div>}</div><Link href={`/go/${deal.slug}?source=web`} className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-bold text-white">View deal <ArrowUpRight size={16}/></Link></div></div></article>)}</div>}</section>
-    <section id="stores" className="border-y border-slate-200 bg-white py-10"><div className="mx-auto max-w-7xl px-4"><p className="text-center text-xs font-bold uppercase tracking-[.2em] text-slate-400">Participating retailers</p><p className="mt-3 text-center text-sm text-slate-500">Amazon · Flipkart · Myntra · AJIO · Meesho · Affiliate networks</p></div></section>
-    <section id="videos" className="mx-auto max-w-7xl px-4 py-14"><h2 className="text-2xl font-black">Watch it. Find it. Shop it.</h2><p className="mt-2 text-slate-500">Connect your YouTube channel feed to feature reviews, hauls, and products in one place.</p></section>
-    <footer className="border-t border-slate-200 bg-white"><div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-8 text-sm text-slate-500 md:flex-row md:items-center md:justify-between"><span>© {new Date().getFullYear()} ApexDeal AI</span><span>We may earn a commission from qualifying purchases. Prices and availability can change at the retailer.</span><a href="mailto:support@yourdomain.com" className="font-semibold text-slate-700">Contact support</a></div></footer>
-  </main>;
+  const deals = await prisma.deal.findMany({
+    orderBy: {
+      createdAt: "desc",
+    },
+    include: {
+      store: true,
+    },
+  });
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-6">Latest Deals</h1>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {deals.length === 0 ? (
+            <p className="text-slate-400">No deals published yet.</p>
+          ) : (
+            deals.map((deal) => (
+              <div
+                key={deal.id}
+                className="border border-slate-800 rounded-xl p-4 bg-slate-900/50"
+              >
+                {deal.imageUrl && (
+                  <img
+                    src={deal.imageUrl}
+                    alt={deal.title}
+                    className="w-full h-48 object-cover rounded-lg mb-3"
+                  />
+                )}
+                <h2 className="font-semibold text-lg line-clamp-2">{deal.title}</h2>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-emerald-400 font-bold">
+                    ₹{deal.dealPrice.toString()}
+                  </span>
+                  {deal.originalPrice && (
+                    <span className="text-slate-500 line-through text-sm">
+                      ₹{deal.originalPrice.toString()}
+                    </span>
+                  )}
+                </div>
+                <a
+                  href={`/go/${deal.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 block w-full text-center bg-blue-600 hover:bg-blue-500 text-white py-2 rounded-lg font-medium transition-colors"
+                >
+                  Grab Deal
+                </a>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </main>
+  );
 }
