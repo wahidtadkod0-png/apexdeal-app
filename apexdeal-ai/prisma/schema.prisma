@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole { USER ADMIN SUPERADMIN }
+enum DealStatus { DRAFT SCHEDULED PUBLISHED EXPIRED ARCHIVED }
+enum ClickSource { WEB WHATSAPP YOUTUBE TELEGRAM OTHER }
+enum PayoutNetwork { AMAZON FLIPKART EARNKARO CUELINKS ADSENSE YOUTUBE_ADSENSE OTHER }
+enum PayoutStatus { PENDING CLAIMED PAID REJECTED }
+
+model User {
+  id String @id @default(cuid())
+  email String @unique
+  name String?
+  role UserRole @default(USER)
+  mfaVerifiedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdDeals Deal[] @relation("DealCreator")
+}
+
+model Store {
+  id String @id @default(cuid())
+  name String @unique
+  slug String @unique
+  websiteDomain String
+  logoUrl String?
+  affiliateNetwork String?
+  enabled Boolean @default(true)
+  // Secret affiliate credentials belong in a secrets manager, not this table.
+  publicConfig Json?
+  deals Deal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Deal {
+  id String @id @default(cuid())
+  slug String @unique
+  title String
+  description String? @db.Text
+  whyBuy String? @db.Text
+  imageUrl String?
+  productUrl String
+  affiliateUrl String
+  category String
+  tags String[] @default([])
+  price Decimal? @db.Decimal(12,2)
+  originalPrice Decimal? @db.Decimal(12,2)
+  currency String @default("INR")
+  discountPercent Int?
+  qualityScore Int? // Validate 1..100 in application layer.
+  isSuperLoot Boolean @default(false)
+  status DealStatus @default(DRAFT)
+  startsAt DateTime?
+  expiresAt DateTime?
+  storeId String
+  store Store @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  createdById String?
+  createdBy User? @relation("DealCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  clicks ClickLog[]
+  impressions Impression[]
+  videoProducts VideoProduct[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, startsAt, expiresAt])
+  @@index([category, createdAt])
+}
+
+model ClickLog {
+  id String @id @default(cuid())
+  dealId String
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  source ClickSource @default(WEB)
+  storeNameSnapshot String?
+  refererHost String?
+  countryCode String?
+  region String?
+  city String?
+  deviceType String?
+  // Hash a normalized IP with a rotating secret if deduplication is needed; never store raw IP.
+  visitorHash String?
+  botSuspected Boolean @default(false)
+  clickedAt DateTime @default(now())
+  @@index([dealId, clickedAt])
+  @@index([source, clickedAt])
+}
+
+model Impression {
+  id String @id @default(cuid())
+  dealId String
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  placement String @default("feed")
+  sessionHash String?
+  createdAt DateTime @default(now())
+  @@index([dealId, createdAt])
+}
+
+model Conversion {
+  id String @id @default(cuid())
+  network PayoutNetwork
+  externalOrderId String?
+  dealSlug String?
+  clickId String?
+  amount Decimal? @db.Decimal(12,2)
+  commission Decimal? @db.Decimal(12,2)
+  currency String @default("INR")
+  status String @default("ESTIMATED")
+  convertedAt DateTime?
+  createdAt DateTime @default(now())
+  @@unique([network, externalOrderId])
+  @@index([network, createdAt])
+}
+
+model PayoutRecord {
+  id String @id @default(cuid())
+  network PayoutNetwork
+  amount Decimal @db.Decimal(12,2)
+  currency String @default("INR")
+  status PayoutStatus @default(PENDING)
+  claimedAt DateTime?
+  settledAt DateTime?
+  notes String? @db.Text
+  invoiceObjectKey String? // private storage object key, never a public URL
+  externalReference String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([network, status, settledAt])
+}
+
+model AdSetting {
+  id String @id @default(cuid())
+  key String @unique
+  enabled Boolean @default(false)
+  provider String @default("ADSENSE")
+  clientId String?
+  slotId String?
+  placement String
+  // Do not execute arbitrary admin-entered scripts. Store approved structured config only.
+  config Json?
+  updatedAt DateTime @updatedAt
+}
+
+model FinancialProfile {
+  id String @id @default(cuid())
+  label String
+  provider String // BANK, UPI, PAYPAL, WISE
+  encryptedPayload String // envelope-encrypted server-side; key held outside DB
+  lastFour String?
+  active Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Video {
+  id String @id @default(cuid())
+  youtubeVideoId String @unique
+  title String
+  description String? @db.Text
+  thumbnailUrl String?
+  publishedAt DateTime?
+  products VideoProduct[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VideoProduct {
+  videoId String
+  dealId String
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  deal Deal @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  position Int @default(0)
+  @@id([videoId, dealId])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  actorUserId String?
+  action String
+  resourceType String
+  resourceId String?
+  metadata Json?
+  createdAt DateTime @default(now())
+  @@index([actorUserId, createdAt])
+  @@index([resourceType, resourceId])
+}
